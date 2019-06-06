@@ -2,47 +2,59 @@ import nltk
 import math
 import numpy as np
 from nltk.corpus import twitter_samples
+from nltk.tokenize import TweetTokenizer
 from gensim.models import Word2Vec
 
-pos_tokens = twitter_samples.tokenized('positive_tweets.json')
-pos_tokens = [item for sublist in pos_tokens for item in sublist]
+tweet_tokenizer = TweetTokenizer(preserve_case=False, strip_handles=True, reduce_len=True)
+
+pos_tokens = []
+neg_tokens = []
+for tweet in twitter_samples.strings('positive_tweets.json'):
+    pos_tokens += tweet_tokenizer.tokenize(tweet)
+for tweet in twitter_samples.strings('negative_tweets.json'):
+    neg_tokens += tweet_tokenizer.tokenize(tweet)
+
 pos_fd = nltk.FreqDist(pos_tokens)
-print('number of types:', pos_fd.B())
-print('number of tokens:', pos_fd.N())
-#for word in pos_fd.most_common(30):
-#    print(word)
-
-neg_tokens = twitter_samples.tokenized('negative_tweets.json')
-neg_tokens = [item for sublist in neg_tokens for item in sublist]
 neg_fd = nltk.FreqDist(neg_tokens)
-print('number of types:', neg_fd.B())
-print('number of tokens:', neg_fd.N())
-#for word in pos_fd.most_common(30):
-#    print(word)
+print('number of positive types:', pos_fd.B())
+print('number of positive tokens:', pos_fd.N())
+print('number of negative types:', neg_fd.B())
+print('number of negative tokens:', neg_fd.N())
 
-# bayes classifier
-pos_count = len(twitter_samples.strings('positive_tweets.json'))
-neg_count = len(twitter_samples.strings('negative_tweets.json'))
-k = (pos_fd + neg_fd).B()
-log_prior_pos = math.log(pos_count / (pos_count + neg_count))
-log_prior_neg = math.log(neg_count / (pos_count + neg_count))
-output_file = open('predictions.txt', 'w', encoding='utf-8')
+def bayes_classifier(filename):
+    output_file = open('predictions.txt', 'w', encoding='utf-8')
+    num_pos_predictions = 0
+    num_neg_predictions = 0
 
-for tweet in twitter_samples.tokenized('tweets.20150430-223406.json'):
-    total_log_prob_pos = log_prior_pos
-    total_log_prob_neg = log_prior_neg
+    k = (pos_fd + neg_fd).B()
+    pos_count = len(twitter_samples.strings('positive_tweets.json'))
+    neg_count = len(twitter_samples.strings('negative_tweets.json'))
+    log_prior_pos = math.log(pos_count / (pos_count + neg_count))
+    log_prior_neg = math.log(neg_count / (pos_count + neg_count))
+
+    for tweet in twitter_samples.strings(filename): #fix
+        total_log_prob_pos = log_prior_pos
+        total_log_prob_neg = log_prior_neg
+        tokens = tweet_tokenizer.tokenize(tweet)
+
+        for token in tokens:
+            total_log_prob_neg += math.log((neg_fd[token] + 1) / neg_fd.N() + k)
+            total_log_prob_pos += math.log((pos_fd[token] + 1) / pos_fd.N() + k)
+
+        if total_log_prob_pos > total_log_prob_neg:
+            num_pos_predictions += 1
+            print('pos', file=output_file)
+        else:
+            num_neg_predictions += 1
+            print('neg', file=output_file)
+
+    print('\nnumber of positive tweets: ', num_pos_predictions, file=output_file)
+    print('number of negative tweets: ', num_neg_predictions, file=output_file)
+
     
-    for token in tweet:
-        total_log_prob_neg += math.log((neg_fd[token] + 1) / neg_fd.N() + k)
-        total_log_prob_pos += math.log((pos_fd[token] + 1) / pos_fd.N() + k)
-        
-    if total_log_prob_pos > total_log_prob_neg:
-        num_pos_predictions += 1
-        print(tweet, 'pos', file=output_file)
-    else:
-        num_neg_predictions += 1
-        print(tweet, 'neg', file=output_file)
-
+    
+    
+#work in progress
 # cosine similarity
 #https://rare-technologies.com/word2vec-tutorial/
 model = Word2Vec(twitter_samples.tokenized('negative_tweets.json') + 

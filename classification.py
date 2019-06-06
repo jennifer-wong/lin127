@@ -95,20 +95,22 @@ def knn(inputFilename, outputFilename):
                 continue
         vector = vector / num_tokens
     
-    for train_vector in train_vec:
-        counter = 0
-        highest_cossim = 0
-        index = 0
-        cossim = get_cossim(vector, train_vector)
-        if cossim > highest_cossim:
-            most_similar = sim
-            index = counter
-        counter += 1
+        for train_vector in train_vec:
+            counter = 0
+            highest_cossim = 0
+            index = 0
+            cossim = get_cossim(vector, train_vector)
+            if cossim > highest_cossim:
+                most_similar = sim
+                index = counter
+            counter += 1
         
-    if index < 5000:
-        print('pos', file=output_file)
-    else:
-        print('neg', file=output_file)
+        if index < 5000:
+            num_pos_predictions += 1
+            print('pos', file=output_file)
+        else:
+            num_neg_predictions += 1
+            print('neg', file=output_file)
         
     print('\nnumber of positive tweets: ', num_pos_predictions, file=output_file)
     print('number of negative tweets: ', num_neg_predictions, file=output_file)

@@ -52,46 +52,63 @@ def bayes_classifier(filename):
     print('number of negative tweets: ', num_neg_predictions, file=output_file)
 
     
+tweets = []
+for tweet in twitter_samples.strings('positive_tweets.json'):
+    tweets += [tweet_tokenizer.tokenize(tweet)]
+for tweet in twitter_samples.strings('negative_tweets.json'):
+    tweets += [tweet_tokenizer.tokenize(tweet)]
     
-    
-#work in progress
-# cosine similarity
-#https://rare-technologies.com/word2vec-tutorial/
-model = Word2Vec(twitter_samples.tokenized('negative_tweets.json') + 
-                 twitter_samples.tokenized('positive_tweets.json'))
-model.save('twitterModel')
+model = Word2Vec(tweets)
 
-train_vec = [] #first 5000 are pos, last 5000 neg
-for tweet in twitter_samples.tokenized('positive_tweets.json') + twitter_samples.tokenized('negative_tweets.json'):
+# stores the sentence vector of each tweet in training set
+train_vec = [] #first 5000 are pos, last 5000 are neg
+for tweet in twitter_samples.strings('positive_tweets.json') + twitter_samples.strings('positive_tweets.json'):
     vector = np.zeros(shape=(100,))
-    for token in tweet:
+    num_tokens = 0
+    for token in tweet_tokenizer.tokenize(tweet):
         try:
             vector += model[token]
+            num_tokens += 1
         except:
-            print('token not in vocab')
+            continue
+    vector = vector / num_tokens
     train_vec.append(vector)
+
+def get_cossim(vec1, vec2):
+    return (np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
+
+# knn classifier using cosine similarity
+# https://rare-technologies.com/word2vec-tutorial/
+def knn(inputFilename, outputFilename):
+    output_file = open(outputFilename, 'w', encoding='utf-8')
+    num_pos_predictions = 0
+    num_neg_predictions = 0
     
-def cos_sim(vec1, vec2):
-    return (np.dot(vec1, vec2) / (np.linalg.norm(vec1, 2) * np.linalg.norm(vec2, 2)))
+    for tweet in twitter_samples.strings(inputFilename):
+        vector = np.zeros(shape=(100,))
+        num_tokens = 0
+        for token in tweet_tokenizer.tokenize(tweet):
+            try:
+                vector += model[token]
+                num_tokens += 1
+            except:
+                continue
+        vector = vector / num_tokens
     
-output_file = open('predictions2.txt', 'w', encoding='utf-8')
-for tweet in twitter_samples.tokenized('tweets.20150430-223406.json'):
-    vector = np.zeros(shape=(100,))
-    for token in tweet:
-        try:
-            vector += model[token]
-        except:
-            print('token not in vocab')
     for train_vector in train_vec:
         counter = 0
-        most_similar = 0
+        highest_cossim = 0
         index = 0
-        sim = cos_sim(vector, train_vector)
-        if sim > most_similar:
+        cossim = get_cossim(vector, train_vector)
+        if cossim > highest_cossim:
             most_similar = sim
             index = counter
         counter += 1
+        
     if index < 5000:
-        print(tweet, 'pos', file=output_file)
+        print('pos', file=output_file)
     else:
-        print(tweet, 'neg', file=output_file)
+        print('neg', file=output_file)
+        
+    print('\nnumber of positive tweets: ', num_pos_predictions, file=output_file)
+    print('number of negative tweets: ', num_neg_predictions, file=output_file)
